@@ -121,3 +121,22 @@ void pyi_debug_vs(const char *fmt, ...)
         va_end(args);
     }
 }
+
+/* Called early to allow the user to define the debug variant. */
+void setup_pyi_debug()
+{
+    const char *debug_option = pyi_getenv("PYI_LOADER_DEBUG");
+    if (debug_option) {
+#ifdef WIN32
+        if (strcmp(debug_option, "mbox") == 0) {
+            _pyi_debug_vs = mbvs;
+        }
+#endif
+        else if (strcmp(debug_option, "print") == 0) {
+            _pyi_debug_vs = stbvprint;
+        }
+        else if (strcmp(debug_option, "disable") == 0) {
+            _pyi_debug_vs = NULL;
+        }
+    }
+}

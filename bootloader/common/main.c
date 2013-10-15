@@ -76,6 +76,8 @@ int main(int argc, char* argv[])
 #endif
     int i = 0;
 
+    setup_pyi_debug();
+
     archive_status = (ARCHIVE_STATUS *) calloc(1,sizeof(ARCHIVE_STATUS));
     if (archive_status == NULL) {
         FATALERROR("Cannot allocate memory for ARCHIVE_STATUS\n");
