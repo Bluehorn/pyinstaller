@@ -77,6 +77,7 @@ int main(int argc, char* argv[])
     int i = 0;
 
     setup_pyi_debug();
+    setup_pyi_redirect();
 
     archive_status = (ARCHIVE_STATUS *) calloc(1,sizeof(ARCHIVE_STATUS));
     if (archive_status == NULL) {

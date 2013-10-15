@@ -758,12 +758,19 @@ STB_EXTERN __declspec(dllimport) int __stdcall SetConsoleTextAttribute(void *, u
 
 static void stb__print_one(void *handle, char *s, intptr_t len)
 {
-   if (len)
-      // Explicitly change 'len' type to int32_t.
-      if (WriteConsoleA(handle, s, (int32_t) len, NULL,NULL) == STB_FALSE) {
-          // Writing to console failed, so do normal. Maybe stdout is redirected.
+   if (len) {
+      int written = 0;
+
+      if (GetConsoleWindow()) {
+         // Explicitly change 'len' type to int32_t.
+         written = WriteConsoleA(handle, s, (int32_t) len, NULL,NULL);
+      }
+
+      if (!written) {
+         // Writing to console failed, so do normal. Maybe stdout is redirected.
          fwrite(s, 1, len, stdout);
-    }
+      }
+   }
 }
 
 static void stb__print(char *s)

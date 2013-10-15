@@ -28,12 +28,18 @@
 #include <stdarg.h>  /* va_list, va_start(), va_end() */
 #include <stdio.h>
 
+/* Can not include via
+   #include "pyi_utils.h"
+   as this causes a circular include. Declare it manually for now. */
+char *pyi_getenv(const char *variable);
+
 
 #ifdef WIN32
  #include <windows.h>
  #include <direct.h>
  #include <process.h>
  #include <io.h>
+ #include <fcntl.h>
 #endif
 
 
@@ -139,4 +145,90 @@ void setup_pyi_debug()
             _pyi_debug_vs = NULL;
         }
     }
+}
+
+#ifdef WIN32
+static HANDLE _dup_win_handle(HANDLE win_handle)
+{
+    HANDLE current_process = GetCurrentProcess();
+    HANDLE new_handle = 0;
+    int okay = DuplicateHandle(
+            current_process,        /* source process */
+            win_handle,             /* source handle */
+            current_process,        /* target process */
+            &new_handle,            /* target handle */
+            0,                      /* desired access */
+            TRUE,                   /* inherit to child processes */
+            DUPLICATE_SAME_ACCESS); /* options */
+    return okay ? new_handle : 0;
+}
+
+static void _set_posix_handle(int posix_handle, HANDLE win_handle)
+{
+    /* TODO: Error handling. */
+    HANDLE dup_win_handle = _dup_win_handle(win_handle);
+    int dup_posix_handle = _open_osfhandle((intptr_t) dup_win_handle, _O_TEXT);
+    _dup2(dup_posix_handle, posix_handle);
+    _close(dup_posix_handle);
+}
+#endif
+
+void setup_pyi_redirect()
+{
+#ifdef WIN32
+    FILE *tfile = NULL;
+    HANDLE outfile;
+    char *filename = NULL;
+    const char *redirect_option = pyi_getenv("PYI_LOADER_REDIRECT");
+    if (!redirect_option)
+        return;
+
+    /* Compute the filename. Note that we have to include some
+       discriminator that decides between parent and child process.
+       Otherwise, in a onefile build creation of the file will
+       fail. */
+    filename = stb_mprintf("%s.%lu", redirect_option,
+                (unsigned long) GetCurrentProcessId());
+
+    /* Can not allocate filename. What can we do? */
+    if (!filename)
+        return;
+
+    /* Great fun. First we have to redirect the Windows Handles. */
+    outfile = CreateFile(
+            filename,
+            GENERIC_WRITE | GENERIC_READ,       /* desired access */
+            FILE_SHARE_READ,                    /* share mode */
+            NULL,                               /* security attributes */
+            CREATE_ALWAYS,                      /* creation disposition */
+            FILE_ATTRIBUTE_NORMAL | FILE_FLAG_WRITE_THROUGH,
+                                                /* flags and attributes */
+            NULL);                              /* template file */
+
+    SetStdHandle(STD_OUTPUT_HANDLE, outfile);
+    SetStdHandle(STD_ERROR_HANDLE, outfile);
+
+    /* But to see stdio output we have to map this to the POSIX handles. */
+    _set_posix_handle(1, outfile);
+    _set_posix_handle(2, outfile);
+
+    /* Finally, we also have to connect the stdio streams. This should not be
+       needed as stdout should be connected to fileno 1 etc, but it seems that
+       this is not the case on Windows for GUI applications.
+
+       Unbelievable, but the following is sanctioned by MSDN - see this article:
+       http://support.microsoft.com/kb/105305
+       IMHO it is a hack to assign to *stdout but if that's the only way,
+       what can you do?  -- Torsten */
+
+    tfile = _fdopen(1, "w");
+    *stdout = *tfile;
+    setvbuf(stdout, NULL, _IONBF, 0);
+
+    tfile = _fdopen(2, "w");
+    *stderr = *tfile;
+    setvbuf(stderr, NULL, _IONBF, 0);
+
+    free(filename);
+#endif
 }

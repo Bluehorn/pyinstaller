@@ -94,6 +94,9 @@
 #define VS pyi_debug_vs
 void pyi_debug_vs(const char *fmt, ...);
 
+void setup_pyi_debug();
+void setup_pyi_redirect();
+
 
 /* Path and string macros. */
 
