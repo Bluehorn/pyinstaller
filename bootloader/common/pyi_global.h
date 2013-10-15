@@ -91,22 +91,8 @@
 #endif /* WIN32 and WINDOWED */
 
 
-/* Enable or disable debug output. */
-
-#ifdef LAUNCH_DEBUG
-    #if defined(WIN32) && defined(WINDOWED)
-        #define VS mbvs
-        void mbvs(const char *fmt, ...);
-    #else
-        #define VS stbprint
-    #endif
-#else
-    #ifdef WIN32
-        #define VS
-    #else
-        #define VS(...)
-    #endif
-#endif
+#define VS pyi_debug_vs
+void pyi_debug_vs(const char *fmt, ...);
 
 
 /* Path and string macros. */

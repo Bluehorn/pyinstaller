@@ -213,6 +213,7 @@ Parenthesized items have since been removed.
 #include <stdio.h>      // need FILE
 #include <string.h>     // stb_define_hash needs memcpy/memset
 #include <time.h>       // stb_dirtree
+#include <stdarg.h>
 
 
 // MSVC 2008 and earlier does not contain header <stdint.h>
@@ -247,7 +248,6 @@ Parenthesized items have since been removed.
 
 #ifdef STB_DEFINE
    #include <assert.h>
-   #include <stdarg.h>
    #include <ctype.h>
    #include <math.h>
    #ifndef _WIN32
@@ -708,6 +708,7 @@ STB_EXTERN char * stb_sstrdup(char *s);
 //
 
 STB_EXTERN void stbprint(const char *fmt, ...);
+STB_EXTERN void stbvprint(const char *fmt, va_list);
 STB_EXTERN char *stb_sprintf(const char *fmt, ...);
 STB_EXTERN char *stb_mprintf(const char *fmt, ...);
 
@@ -744,6 +745,15 @@ char *stb_mprintf(const char *fmt, ...)
 STB_EXTERN __declspec(dllimport) int __stdcall WriteConsoleA(void *, const void *, unsigned int, unsigned int *, void *);
 STB_EXTERN __declspec(dllimport) void * __stdcall GetStdHandle(unsigned int);
 STB_EXTERN __declspec(dllimport) int __stdcall SetConsoleTextAttribute(void *, unsigned short);
+#endif
+
+/* Provide va_copy if not available (likely on Windows). */
+#ifndef va_copy
+#ifdef __va_copy
+#define va_copy(dst,src)  __va_copy(dst,src)
+#else
+#define va_copy(dst,src) ((dst) = (src))
+#endif
 #endif
 
 static void stb__print_one(void *handle, char *s, intptr_t len)
@@ -830,21 +840,21 @@ static void stb__print(char *s)
    SetConsoleTextAttribute(handle, 0x07);
 }
 
-void stbprint(const char *fmt, ...)
+void stbvprint(const char *fmt, va_list args)
 {
    int res;
    char buffer[1024];
    char *tbuf = buffer;
    va_list v;
 
-   va_start(v,fmt);
+   va_copy(v, args);
    res = _vsnprintf(buffer, sizeof(buffer), fmt, v);
    va_end(v);
    buffer[sizeof(buffer)-1] = 0;
 
    if (res < 0) {
       tbuf = (char *) malloc(16384);
-      va_start(v,fmt);
+      va_copy(v, args);
       res = _vsnprintf(tbuf,16384, fmt, v);
       va_end(v);
       tbuf[16383] = 0;
@@ -856,6 +866,14 @@ void stbprint(const char *fmt, ...)
       free(tbuf);
 }
 
+void stbprint(const char *fmt, ...)
+{
+   va_list args;
+   va_start(args,fmt);
+   stbvprint(fmt, args);
+   va_end(args);
+}
+
 #else  // _WIN32
 void stbprint(const char *fmt, ...)
 {
@@ -863,6 +881,10 @@ void stbprint(const char *fmt, ...)
    va_start(v,fmt);
    vprintf(fmt,v);
    va_end(v);
+}
+void stbvprint(const char *fmt, va_list args)
+{
+   vprintf(fmt, args);
 }
 #endif // _WIN32
 #endif // STB_DEFINE
